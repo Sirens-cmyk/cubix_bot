@@ -129,6 +129,45 @@ h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spaci
 .btn.ghost{background:var(--card);border:1px solid #4a585e}
 .hint{text-align:center;color:#6f8186;font-size:13px;margin:12px 0 0}
 
+/* ---------- Games + Sudoku ---------- */
+.card.lesson-card{margin-bottom:14px}
+.card.lesson-card.soon{opacity:.55;cursor:default}
+.back{color:var(--muted);font-weight:600;font-size:16px;padding:2px 0 10px;align-self:flex-start;display:block}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#2f393c;border:1px solid #3b474c;
+  border-radius:14px;padding:4px}
+.seg button{height:38px;border-radius:10px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--mint);color:#06302b}
+.sd-info{display:flex;justify-content:space-between;color:var(--muted);font-weight:600;margin:14px 2px;
+  font-variant-numeric:tabular-nums;font-size:15px}
+.sd-info b{color:var(--text)}
+#sdGrid{display:grid;grid-template-columns:repeat(9,1fr);width:min(100%,calc(100dvh - 420px),440px);
+  min-width:288px;aspect-ratio:1;margin:0 auto;border:2px solid #6c8086;border-radius:10px;overflow:hidden;
+  background:#30393c}
+.cell{position:relative;display:grid;place-items:center;padding:0;font-size:clamp(18px,5.6vw,26px);
+  font-weight:500;color:var(--mint-soft);border-right:1px solid #435055;border-bottom:1px solid #435055;
+  background:transparent;border-radius:0}
+.cell.cr{border-right:2px solid #6c8086}
+.cell.br{border-bottom:2px solid #6c8086}
+.cell.g{color:var(--text);font-weight:700}
+.cell.rel{background:#364543}
+.cell.same{background:#2f5a57}
+.cell.sel{background:#2a7a73;color:#fff}
+.cell.err{color:#ff7b7b}
+.nt{display:grid;grid-template-columns:repeat(3,1fr);width:100%;height:100%;padding:1px;
+  font-size:clamp(7px,2.2vw,10px);color:#9fb0b4;font-weight:600}
+.nt i{font-style:normal;display:grid;place-items:center}
+.sd-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 10px}
+.sd-tools button{height:44px;border-radius:14px;background:var(--card);border:1px solid #4a585e;
+  font-weight:600;font-size:14px;color:#c4d0d2}
+.sd-tools button.on{background:var(--mint-dim);border-color:var(--mint);color:var(--mint)}
+.sd-tools button:disabled{opacity:.4}
+.sd-pad{display:grid;grid-template-columns:repeat(9,1fr);gap:5px}
+.sd-pad button{height:58px;border-radius:12px;background:var(--card);border:1px solid #4a585e;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.sd-pad button b{font-size:23px;font-weight:600;color:var(--mint-soft)}
+.sd-pad button small{font-size:10px;color:var(--muted)}
+.sd-pad button:disabled{opacity:.3}
+
 /* ---------- Learn ---------- */
 .lesson{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-bottom:12px;
   background:var(--card);border:1px solid #435055;border-radius:20px;padding:16px}
@@ -205,7 +244,10 @@ h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spaci
   <main>
     <section id="home" class="view active"></section>
 
+    <section id="games" class="view"></section>
+
     <section id="play" class="view">
+      <button class="back" data-go="games">&lsaquo; Games</button>
       <div class="timer-box"><div id="timer">0.00</div><div id="status">Free play. Scramble to start a timed solve.</div></div>
       <div class="stage"><canvas id="gl"></canvas></div>
       <div class="controls">
@@ -215,13 +257,27 @@ h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spaci
       <p class="hint">Swipe a face to turn a layer. Drag the background to rotate the cube.</p>
     </section>
 
+    <section id="sudoku" class="view">
+      <button class="back" data-go="games">&lsaquo; Games</button>
+      <div class="seg" id="sdDiff">
+        <button data-d="easy" class="on">Easy</button><button data-d="medium">Medium</button><button data-d="hard">Hard</button>
+      </div>
+      <div class="sd-info"><span>Mistakes <b id="sdMistakes">0/3</b></span><b id="sdTime">0:00</b></div>
+      <div id="sdGrid"></div>
+      <div class="sd-tools">
+        <button id="sdUndo">Undo</button><button id="sdErase">Erase</button>
+        <button id="sdNotes">Notes off</button><button id="sdHint">Hint 3</button>
+      </div>
+      <div class="sd-pad" id="sdPad"></div>
+    </section>
+
     <section id="learn" class="view"></section>
     <section id="rank" class="view"></section>
   </main>
 
   <nav id="nav">
     <button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7v9a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></svg>Home</button>
-    <button data-tab="play"><svg viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>Play</button>
+    <button data-tab="games"><svg viewBox="0 0 24 24"><path d="M7 7h10a4.5 4.5 0 0 1 4.4 5.4l-.7 3.6a2.6 2.6 0 0 1-4.4 1.3L14.5 15h-5l-1.8 2.3A2.6 2.6 0 0 1 3.3 16l-.7-3.6A4.5 4.5 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3M15.5 11h.01M17.5 12.5h.01"/></svg>Games</button>
     <button data-tab="learn"><svg viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/></svg>Learn</button>
     <button data-tab="rank"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5v1.5A3.5 3.5 0 0 0 8 11M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11M12 13v4M8.5 20.5h7M9.5 17h5v3.5h-5z"/></svg>Rank</button>
   </nav>
@@ -240,7 +296,7 @@ const userName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).
 const userHandle = tgUser && tgUser.username ? '@' + tgUser.username : 'Guest';
 const userPhoto = tgUser && tgUser.photo_url;
 
-const state = { solves: 0, best: null, lessons: Array(7).fill(false) };
+const state = { solves: 0, best: null, sdSolved: 0, lessons: Array(7).fill(false) };
 const LESSONS = [
   ['White cross', 'Build a plus on the white face, edges matching the side centers.'],
   ['White corners', 'Insert the four white corners to finish the first layer.'],
@@ -365,15 +421,33 @@ function renderRank() {
 let tab = 'home';
 function switchTab(t) {
   tab = t;
+  const navTab = (t === 'play' || t === 'sudoku') ? 'games' : t;
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === t));
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
   if (t === 'home') renderHome();
+  if (t === 'games') renderGames();
   if (t === 'learn') renderLearn();
   if (t === 'rank') renderRank();
   if (t === 'play') requestAnimationFrame(resizeGL);
+  if (t === 'sudoku') sdOpen(); else sdPause();
   haptic();
 }
 document.querySelectorAll('#nav button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) switchTab(b.dataset.go); });
+
+function renderGames() {
+  $('games').innerHTML = `<h1>Games</h1>
+    <button class="card lesson-card" data-go="play">
+      <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"><path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/></svg></div>
+      <div><h3>Rubik\u2019s Cube</h3><p>Scramble the 3&times;3 and race the clock.</p>
+      <span class="tag">${state.best != null ? 'Best ' + fmt(state.best) : 'Not played yet'}</span></div></button>
+    <button class="card lesson-card" data-go="sudoku">
+      <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linecap="round"><rect x="8" y="8" width="48" height="48" rx="6"/><path d="M24 8v48M40 8v48M8 24h48M8 40h48" stroke-width="2.2"/><path d="M28 30l4-3v10" stroke-width="3"/></svg></div>
+      <div><h3>Sudoku</h3><p>Fill every row, column and box with 1 to 9.</p>
+      <span class="tag">${state.sdSolved ? 'Solved ' + state.sdSolved : 'Not played yet'}</span></div></button>
+    <div class="card lesson-card soon"><div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#6f8186" stroke-width="3.2" stroke-linecap="round"><rect x="8" y="14" width="48" height="36" rx="8"/><path d="M26 32h12M32 26v12"/></svg></div>
+      <div><h3>More games soon</h3><p>New puzzles are on the way.</p></div></div>`;
+}
 
 /* =========================================================
    Rubik's cube (Three.js)
@@ -585,7 +659,7 @@ async function scramble() {
   for (let i = 0; i < 22; i++) {
     let a; do { a = axes[Math.floor(Math.random() * 3)]; } while (a === lastAxis);
     lastAxis = a;
-    await turn(a, [-1, 0, 1][Math.floor(Math.random() * 3)] === 0 && Math.random() < .6 ? 1 : [-1, 1][Math.floor(Math.random() * 2)], Math.random() < .5 ? 1 : -1, 75);
+    await turn(a, Math.random() < .5 ? -1 : 1, Math.random() < .5 ? 1 : -1, 75);
   }
   if (isSolved()) return scramble();
   phase = 'ready'; setStatus('Your first move starts the timer.');
@@ -596,6 +670,204 @@ $('btnReset').onclick = () => {
   if (busy) return; stopTimer(); resetCube(); phase = 'idle';
   $('timer').textContent = '0.00'; setStatus('Free play. Scramble to start a timed solve.');
 };
+
+/* =========================================================
+   Sudoku
+   ========================================================= */
+const SD = { sol: [], given: [], cur: [], notes: [], sel: -1, notesOn: false, mistakes: 0, hints: 3,
+  diff: 'easy', hist: [], elapsed: 0, last: 0, tick: null, over: true, ready: false };
+const SD_CLUES = { easy: 38, medium: 31, hard: 26 };
+const sdCells = [], sdPadBtns = [];
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function popcnt(m) { let n = 0; while (m) { m &= m - 1; n++; } return n; }
+const boxOf = i => (((i / 27) | 0) * 3) + (((i % 9) / 3) | 0);
+
+function solveSd(g, limit, rand) {
+  const rows = Array(9).fill(0), cols = Array(9).fill(0), boxes = Array(9).fill(0);
+  for (let i = 0; i < 81; i++) { const v = g[i]; if (v) { const b = 1 << v; rows[(i / 9) | 0] |= b; cols[i % 9] |= b; boxes[boxOf(i)] |= b; } }
+  let count = 0, sol = null;
+  const rec = () => {
+    let best = -1, bm = 0, bn = 10;
+    for (let i = 0; i < 81; i++) {
+      if (g[i]) continue;
+      const av = ~(rows[(i / 9) | 0] | cols[i % 9] | boxes[boxOf(i)]) & 0x3FE, n = popcnt(av);
+      if (n < bn) { bn = n; best = i; bm = av; if (n <= 1) break; }
+    }
+    if (best < 0) { count++; if (rand && !sol) sol = g.slice(); return; }
+    if (bn === 0) return;
+    const r = (best / 9) | 0, c = best % 9, b = boxOf(best), ds = [];
+    for (let v = 1; v <= 9; v++) if (bm & (1 << v)) ds.push(v);
+    if (rand) shuffle(ds);
+    for (const v of ds) {
+      const bit = 1 << v; g[best] = v; rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit;
+      rec();
+      g[best] = 0; rows[r] &= ~bit; cols[c] &= ~bit; boxes[b] &= ~bit;
+      if (count >= limit) return;
+    }
+  };
+  rec();
+  return { count, sol };
+}
+
+function genPuzzle(diff) {
+  const full = solveSd(Array(81).fill(0), 1, true).sol, p = full.slice();
+  let clues = 81;
+  for (const i of shuffle([...Array(81).keys()])) {
+    if (clues <= SD_CLUES[diff]) break;
+    const v = p[i]; p[i] = 0;
+    if (solveSd(p.slice(), 2, false).count !== 1) p[i] = v; else clues--;
+  }
+  return { sol: full, given: p };
+}
+
+function buildSdUI() {
+  const grid = $('sdGrid');
+  for (let i = 0; i < 81; i++) {
+    const b = document.createElement('button');
+    b.onclick = () => { SD.sel = i; paintSd(); };
+    grid.appendChild(b); sdCells.push(b);
+  }
+  const pad = $('sdPad');
+  for (let v = 1; v <= 9; v++) {
+    const b = document.createElement('button');
+    b.onclick = () => sdInput(v);
+    pad.appendChild(b); sdPadBtns.push(b);
+  }
+  $('sdDiff').querySelectorAll('button').forEach(b => b.onclick = () => {
+    if (b.dataset.d === SD.diff && !SD.over) return;
+    newSudoku(b.dataset.d);
+  });
+  $('sdUndo').onclick = sdUndo;
+  $('sdErase').onclick = sdErase;
+  $('sdNotes').onclick = () => { SD.notesOn = !SD.notesOn; paintSd(); };
+  $('sdHint').onclick = sdHint;
+}
+
+function paintSd() {
+  const sel = SD.sel, sv = sel >= 0 ? SD.cur[sel] : 0;
+  const sr = sel >= 0 ? (sel / 9) | 0 : -1, sc = sel >= 0 ? sel % 9 : -1, sb = sel >= 0 ? boxOf(sel) : -1;
+  for (let i = 0; i < 81; i++) {
+    const r = (i / 9) | 0, c = i % 9;
+    let cls = 'cell' + (c % 3 === 2 && c < 8 ? ' cr' : '') + (r % 3 === 2 && r < 8 ? ' br' : '');
+    if (SD.given[i]) cls += ' g';
+    if (i === sel) cls += ' sel';
+    else if (sel >= 0) {
+      if (r === sr || c === sc || boxOf(i) === sb) cls += ' rel';
+      if (sv && SD.cur[i] === sv) cls += ' same';
+    }
+    if (SD.cur[i] && !SD.given[i] && SD.cur[i] !== SD.sol[i]) cls += ' err';
+    const el = sdCells[i]; el.className = cls;
+    if (SD.cur[i]) el.textContent = SD.cur[i];
+    else if (SD.notes[i]) {
+      let h = '<span class="nt">';
+      for (let v = 1; v <= 9; v++) h += `<i>${SD.notes[i] & (1 << v) ? v : ''}</i>`;
+      el.innerHTML = h + '</span>';
+    } else el.textContent = '';
+  }
+  for (let v = 1; v <= 9; v++) {
+    let placed = 0;
+    for (let i = 0; i < 81; i++) if (SD.cur[i] === v && SD.sol[i] === v) placed++;
+    const b = sdPadBtns[v - 1], rem = 9 - placed;
+    b.innerHTML = `<b>${v}</b><small>${rem}</small>`; b.disabled = rem === 0 || SD.over;
+  }
+  $('sdMistakes').textContent = SD.mistakes + '/3';
+  $('sdNotes').textContent = SD.notesOn ? 'Notes on' : 'Notes off';
+  $('sdNotes').classList.toggle('on', SD.notesOn);
+  $('sdHint').textContent = 'Hint ' + SD.hints; $('sdHint').disabled = SD.hints <= 0 || SD.over;
+  $('sdDiff').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.d === SD.diff));
+}
+
+function sdTimeStr() {
+  const s = Math.floor((SD.elapsed + (SD.tick ? performance.now() - SD.last : 0)) / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function sdResume() {
+  if (SD.over || SD.tick || !SD.ready) return;
+  SD.last = performance.now();
+  SD.tick = setInterval(() => { $('sdTime').textContent = sdTimeStr(); }, 500);
+}
+function sdPause() {
+  if (!SD.tick) return;
+  SD.elapsed += performance.now() - SD.last; clearInterval(SD.tick); SD.tick = null;
+}
+function sdOpen() {
+  if (!SD.ready) newSudoku(SD.diff); else sdResume();
+}
+
+function newSudoku(diff) {
+  sdPause(); SD.diff = diff; SD.over = true; SD.ready = false;
+  $('sdTime').textContent = '\u2026';
+  setTimeout(() => {
+    const p = genPuzzle(diff);
+    SD.sol = p.sol; SD.given = p.given; startSd();
+  }, 30);
+}
+function startSd() {
+  SD.cur = SD.given.slice(); SD.notes = Array(81).fill(0); SD.sel = -1; SD.mistakes = 0; SD.hints = 3;
+  SD.hist = []; SD.elapsed = 0; SD.over = false; SD.ready = true; SD.notesOn = false;
+  $('sdTime').textContent = '0:00'; paintSd(); sdResume();
+}
+
+function sdSnap() { SD.hist.push({ cur: SD.cur.slice(), notes: SD.notes.slice() }); if (SD.hist.length > 100) SD.hist.shift(); }
+function sdClearPeerNotes(i, v) {
+  const r = (i / 9) | 0, c = i % 9, b = boxOf(i);
+  for (let j = 0; j < 81; j++) if (((j / 9) | 0) === r || j % 9 === c || boxOf(j) === b) SD.notes[j] &= ~(1 << v);
+}
+const sdWon = () => SD.cur.every((v, i) => v === SD.sol[i]);
+
+function sdInput(v) {
+  if (SD.over || SD.sel < 0) return;
+  const i = SD.sel;
+  if (SD.given[i] || SD.cur[i] === SD.sol[i]) return;
+  if (SD.notesOn) { if (SD.cur[i]) return; sdSnap(); SD.notes[i] ^= (1 << v); paintSd(); return; }
+  sdSnap(); SD.cur[i] = v; SD.notes[i] = 0;
+  if (v !== SD.sol[i]) {
+    SD.mistakes++; haptic();
+    if (SD.mistakes >= 3) { paintSd(); sdLose(); return; }
+  } else { sdClearPeerNotes(i, v); haptic(); }
+  paintSd();
+  if (sdWon()) sdWin();
+}
+function sdErase() {
+  const i = SD.sel;
+  if (SD.over || i < 0 || SD.given[i] || SD.cur[i] === SD.sol[i]) return;
+  if (!SD.cur[i] && !SD.notes[i]) return;
+  sdSnap(); SD.cur[i] = 0; SD.notes[i] = 0; paintSd();
+}
+function sdUndo() {
+  if (SD.over || !SD.hist.length) return;
+  const h = SD.hist.pop(); SD.cur = h.cur; SD.notes = h.notes; paintSd();
+}
+function sdHint() {
+  if (SD.over || SD.hints <= 0) return;
+  let t = SD.sel;
+  if (t < 0 || SD.given[t] || SD.cur[t] === SD.sol[t]) {
+    const open = []; for (let i = 0; i < 81; i++) if (SD.cur[i] !== SD.sol[i]) open.push(i);
+    if (!open.length) return; t = open[Math.floor(Math.random() * open.length)];
+  }
+  sdSnap(); SD.cur[t] = SD.sol[t]; SD.notes[t] = 0; sdClearPeerNotes(t, SD.sol[t]);
+  SD.sel = t; SD.hints--; haptic(); paintSd();
+  if (sdWon()) sdWin();
+}
+
+function showSheet(title, big, sub, buttons) {
+  $('sheetBody').innerHTML = `<h2>${title}</h2><div class="big">${big}</div><div class="sub">${sub}</div>
+    <div class="controls">${buttons.map((b, i) => `<button class="btn ${b[1]}" data-b="${i}">${b[0]}</button>`).join('')}</div>`;
+  $('sheetBody').querySelectorAll('[data-b]').forEach(el => el.onclick = () => { $('sheet').classList.remove('show'); buttons[+el.dataset.b][2](); });
+  $('sheet').classList.add('show');
+}
+function sdWin() {
+  sdPause(); SD.over = true; state.sdSolved++; haptic('success'); paintSd();
+  const d = SD.diff[0].toUpperCase() + SD.diff.slice(1), m = SD.mistakes;
+  showSheet('Puzzle solved', sdTimeStr(), `${d}, ${m === 0 ? 'no mistakes' : m + (m === 1 ? ' mistake' : ' mistakes')}.`,
+    [['New puzzle', 'main', () => newSudoku(SD.diff)], ['Close', 'ghost', () => {}]]);
+}
+function sdLose() {
+  sdPause(); SD.over = true; paintSd();
+  showSheet('Out of mistakes', '3/3', 'Retry the same puzzle or start a new one.',
+    [['Retry', 'main', () => startSd()], ['New puzzle', 'ghost', () => newSudoku(SD.diff)]]);
+}
 
 /* =========================================================
    Loader: particle ring
@@ -634,7 +906,7 @@ $('btnReset').onclick = () => {
 /* =========================================================
    Boot
    ========================================================= */
-renderHome(); renderLearn(); renderRank();
+renderHome(); renderGames(); renderLearn(); renderRank(); buildSdUI();
 const bootStart = performance.now();
 try { initGL(); } catch (e) { console.error('3D init failed', e); }
 const wait = Math.max(0, 2400 - (performance.now() - bootStart));
