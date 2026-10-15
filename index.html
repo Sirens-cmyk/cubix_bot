@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cubix</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#2b3336; --bg-deep:#222a2d; --card:#374044; --card-hi:#3e494d;
+  --line:#47545a; --nav:#1f2427; --mint:#2dd4bf; --mint-soft:#5eead4;
+  --mint-dim:#12413f; --text:#e9efef; --muted:#8c9ca0;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+
+/* ---------- Loader ---------- */
+#loader{position:fixed;inset:0;z-index:100;background:#000;display:grid;place-items:center;
+  transition:opacity .6s ease}
+#loader.done{opacity:0;pointer-events:none}
+.ring-wrap{position:relative;width:min(92vw,460px);aspect-ratio:1}
+#ring{position:absolute;inset:0;width:100%;height:100%}
+.core{position:absolute;left:50%;top:50%;width:40%;aspect-ratio:1;transform:translate(-50%,-50%);
+  border-radius:50%;background:#0a1f1f;border:2px solid #14423f;
+  box-shadow:0 0 0 9px #050c0c, 0 0 0 11px #12403d, 0 0 90px 30px rgba(45,212,191,.12);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.core svg{width:44%;height:auto}
+.core span{color:var(--mint);font-weight:700;letter-spacing:.14em;font-size:clamp(13px,4.2vw,20px)}
+
+/* ---------- App shell ---------- */
+#app{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  max-width:560px;margin:0 auto}
+.top{flex:0 0 auto;height:54px;display:flex;align-items:center;justify-content:center;
+  border-bottom:1px solid #364145;background:var(--bg)}
+.top svg{height:26px;width:auto}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none;overflow-y:auto;padding:20px 18px 24px}
+.view.active{display:block}
+#play.active{display:flex;flex-direction:column;padding-bottom:16px}
+
+nav{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:var(--nav);
+  padding:10px 6px calc(10px + var(--safe-b));border-top:1px solid #2b3236}
+nav button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:4px 0;
+  color:#6f8186;font-size:12.5px;font-weight:500}
+nav button svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--mint)}
+
+h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spacing:-.02em}
+.muted{color:var(--muted)}
+
+/* ---------- Home ---------- */
+.hero{display:flex;align-items:center;gap:16px}
+.avatar{border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;
+  overflow:hidden;flex:0 0 auto;background-size:cover;background-position:center}
+.avatar.big{width:80px;height:80px;border:3px solid var(--mint);font-size:26px;
+  box-shadow:0 0 28px rgba(45,212,191,.25)}
+.hero small{display:block;color:var(--muted);font-size:16px}
+.hero strong{display:block;font-size:26px;line-height:1.15;font-weight:700;letter-spacing:-.01em}
+.hero em{font-style:normal;color:#5d7075;font-size:17px}
+
+.pill{margin:18px 0 14px;display:inline-flex;align-items:center;gap:10px;padding:7px 16px 7px 8px;
+  border:1px solid var(--line);border-radius:999px;font-weight:600;font-size:15px;background:#2f393c}
+.pill .dot{width:32px;height:32px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.pill .dot svg{width:18px;height:18px}
+.pill .ok{width:20px;height:20px;border-radius:50%;background:var(--mint);display:grid;place-items:center}
+.pill .ok svg{width:12px;height:12px;stroke:#0c2b28;stroke-width:3;fill:none}
+
+.modes{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 8px;margin:0 -18px;padding-left:18px;
+  scrollbar-width:none}
+.modes::-webkit-scrollbar{display:none}
+.mode{flex:0 0 auto;width:64px;text-align:center;font-size:13px;color:#6f8186}
+.mode i{display:grid;place-items:center;width:64px;height:64px;border-radius:18px;
+  background:#323c40;border:1px solid #3b474c;margin-bottom:8px;position:relative;font-style:normal;
+  font-weight:700;font-size:17px;color:#566a70}
+.mode.on i{background:#304a4a;border:2px solid var(--mint);color:var(--mint);
+  box-shadow:0 0 22px rgba(45,212,191,.2)}
+.mode.on{color:var(--text);font-weight:600}
+.mode i .lk{position:absolute;right:6px;bottom:6px;width:13px;height:13px;stroke:#566a70;fill:none;stroke-width:2}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.stat{background:var(--card);border:1px solid #435055;border-radius:18px;padding:16px 4px 12px;text-align:center}
+.stat b{display:block;font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);font-weight:500}
+
+.card{background:var(--card);border:1px solid #435055;border-radius:22px;padding:20px}
+.prog-head{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;
+  color:#aab8bb;font-size:17px}
+.prog-head b{color:var(--mint);font-size:20px}
+.bar{height:8px;border-radius:99px;background:#46535a;margin-top:16px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--mint),var(--mint-soft));
+  border-radius:99px;transition:width .5s ease}
+
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin:26px 2px 12px;
+  font-weight:700;font-size:19px;color:#b1bfc2}
+.sec-head button{color:var(--muted);font-size:16px;font-weight:500}
+
+.lesson-card{display:flex;gap:16px;align-items:center;text-align:left;width:100%}
+.tile{flex:0 0 auto;width:74px;height:74px;border-radius:18px;background:#434f54;display:grid;place-items:center}
+.tile svg{width:44px;height:44px}
+.lesson-card h3{margin:0 0 4px;font-size:18px;font-weight:700}
+.lesson-card p{margin:0 0 10px;color:var(--muted);font-size:14.5px;line-height:1.4}
+.tag{display:inline-block;padding:5px 12px;border-radius:12px;background:#1f4944;color:var(--mint);
+  font-weight:700;font-size:14px;margin-right:8px}
+
+/* ---------- Play ---------- */
+.timer-box{text-align:center;padding-top:4px}
+#timer{font-size:68px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+#timer.run{color:var(--mint-soft)}
+#status{margin-top:8px;color:var(--muted);font-size:15px;min-height:22px}
+.stage{flex:1;min-height:0;position:relative;margin:4px -18px}
+.stage::before{content:"";position:absolute;left:50%;top:50%;width:80%;aspect-ratio:1;
+  transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,rgba(45,212,191,.16),rgba(45,212,191,0) 68%)}
+#gl{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.controls{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}
+.btn{height:54px;border-radius:16px;font-weight:700;font-size:17px}
+.btn.main{background:var(--mint);color:#06302b}
+.btn.main:active{background:var(--mint-soft)}
+.btn.ghost{background:var(--card);border:1px solid #4a585e}
+.hint{text-align:center;color:#6f8186;font-size:13px;margin:12px 0 0}
+
+/* ---------- Learn ---------- */
+.lesson{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-bottom:12px;
+  background:var(--card);border:1px solid #435055;border-radius:20px;padding:16px}
+.lesson .n{flex:0 0 auto;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+  background:#2c3639;color:var(--muted);font-weight:700}
+.lesson.done .n{background:var(--mint);color:#06302b}
+.lesson h3{margin:0 0 3px;font-size:17px}
+.lesson p{margin:0;color:var(--muted);font-size:14px;line-height:1.4}
+
+/* ---------- Rank ---------- */
+.podium{display:grid;grid-template-columns:1fr 1.1fr 1fr;align-items:end;gap:10px;margin:10px 0 20px}
+.pod{text-align:center;position:relative}
+.pod .avatar{margin:0 auto;position:relative;overflow:visible}
+.pod .badge{position:absolute;right:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;
+  background:var(--mint);color:#06302b;font-weight:800;font-size:15px;display:grid;place-items:center;
+  border:3px solid var(--bg)}
+.pod.p3 .badge{background:#8a979b}
+.pod .nm{margin-top:12px;font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pod .sc{margin:6px 0 10px;font-size:23px;font-weight:700;color:var(--mint);font-variant-numeric:tabular-nums}
+.pod.p3 .sc{color:#7b8c90}
+.pod .step{border-radius:18px 18px 0 0;background:linear-gradient(#2f5352,#2d4446)}
+.pod.p3 .step{background:linear-gradient(#3a454a,#343e42)}
+.me-card{display:flex;align-items:center;gap:14px;padding:18px;border-radius:22px;background:#2e4a4b;
+  border:2px solid #2a6b66;margin-bottom:24px}
+.me-card .pos{font-weight:800;font-size:25px;color:var(--mint);min-width:56px}
+.me-card .nm{flex:1;font-weight:700;font-size:20px;color:var(--mint-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me-card .sc{font-weight:700;font-size:26px;color:var(--mint);font-variant-numeric:tabular-nums}
+.label{color:var(--muted);font-weight:600;font-size:15px;margin:0 2px 12px}
+.row{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:10px;border-radius:20px;
+  background:#363f43;border:1px solid #3f4b50}
+.row.me{border-color:#2a6b66;background:#2e4a4b}
+.row .pos{width:22px;color:#59696e;font-weight:700;font-size:19px}
+.row .nm{flex:1;font-weight:600;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sc{color:#7e8e92;font-weight:600;font-size:19px;font-variant-numeric:tabular-nums}
+
+/* ---------- Result sheet ---------- */
+#sheet{position:fixed;inset:0;z-index:50;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.55)}
+#sheet.show{display:flex}
+.sheet{width:100%;max-width:560px;background:var(--bg);border-radius:28px 28px 0 0;
+  padding:28px 22px calc(24px + var(--safe-b));text-align:center;border-top:1px solid #4a585e;
+  animation:up .35s cubic-bezier(.2,.9,.3,1)}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.sheet h2{margin:0;font-size:20px;color:var(--muted);font-weight:600}
+.sheet .big{font-size:72px;font-weight:800;letter-spacing:-.03em;color:var(--mint-soft);
+  margin:10px 0 6px;font-variant-numeric:tabular-nums}
+.sheet .sub{color:var(--muted);margin-bottom:24px;min-height:24px}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- Loader -->
+<div id="loader">
+  <div class="ring-wrap">
+    <canvas id="ring"></canvas>
+    <div class="core">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/>
+        <path d="M20 12.5l24 13M44 12.5l-24 13" opacity=".45"/>
+      </svg>
+      <span>CUBIX</span>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <svg viewBox="0 0 120 32" fill="none"><g stroke="#2dd4bf" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M16 3 28 9.5v13L16 29 4 22.5v-13z"/><path d="M4 9.5l12 6.5 12-6.5M16 16v13"/></g>
+      <text x="36" y="22" fill="#2dd4bf" font-family="Inter,sans-serif" font-weight="700" font-size="17" letter-spacing="2">CUBIX</text></svg>
+  </header>
+
+  <main>
+    <section id="home" class="view active"></section>
+
+    <section id="play" class="view">
+      <div class="timer-box"><div id="timer">0.00</div><div id="status">Free play. Scramble to start a timed solve.</div></div>
+      <div class="stage"><canvas id="gl"></canvas></div>
+      <div class="controls">
+        <button class="btn main" id="btnScramble">Scramble</button>
+        <button class="btn ghost" id="btnReset">Reset</button>
+      </div>
+      <p class="hint">Swipe a face to turn a layer. Drag the background to rotate the cube.</p>
+    </section>
+
+    <section id="learn" class="view"></section>
+    <section id="rank" class="view"></section>
+  </main>
+
+  <nav id="nav">
+    <button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7v9a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button data-tab="play"><svg viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>Play</button>
+    <button data-tab="learn"><svg viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/></svg>Learn</button>
+    <button data-tab="rank"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5v1.5A3.5 3.5 0 0 0 8 11M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11M12 13v4M8.5 20.5h7M9.5 17h5v3.5h-5z"/></svg>Rank</button>
+  </nav>
+</div>
+
+<div id="sheet"><div class="sheet" id="sheetBody"></div></div>
+
+<script>
+/* =========================================================
+   Telegram + state
+   ========================================================= */
+const tg = window.Telegram && window.Telegram.WebApp;
+try { if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#2b3336'); tg.setBackgroundColor('#2b3336'); tg.setBottomBarColor && tg.setBottomBarColor('#1f2427'); } } catch (e) {}
+const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+const userName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') : 'Cuber';
+const userHandle = tgUser && tgUser.username ? '@' + tgUser.username : 'Guest';
+const userPhoto = tgUser && tgUser.photo_url;
+
+const state = { solves: 0, best: null, lessons: Array(7).fill(false) };
+const LESSONS = [
+  ['White cross', 'Build a plus on the white face, edges matching the side centers.'],
+  ['White corners', 'Insert the four white corners to finish the first layer.'],
+  ['Middle layer', 'Place the four middle-layer edges with a left or right trigger.'],
+  ['Yellow cross', 'Make a yellow plus on top with F R U R\u2019 U\u2019 F\u2019.'],
+  ['Yellow edges', 'Match the top edges to their side centers.'],
+  ['Place the corners', 'Cycle the yellow corners into their correct spots.'],
+  ['Twist the corners', 'Repeat R\u2019 D\u2019 R D on each corner until the cube is solved.']
+];
+const OTHERS = [
+  ['Aria', 9840], ['Mehdi', 11320], ['Luka', 12050], ['Sana', 13770], ['Omid', 14210],
+  ['Vindi', 15600], ['Amin', 16020], ['Paria', 17450], ['Nora', 18900], ['Kian', 21330], ['Zoe', 24100]
+];
+const GRADS = [
+  'linear-gradient(135deg,#60a5fa,#6366f1)', 'linear-gradient(135deg,#e879f9,#a855f7)',
+  'linear-gradient(135deg,#2dd4bf,#0ea5a4)', 'linear-gradient(135deg,#fbbf24,#f97316)',
+  'linear-gradient(135deg,#f472b6,#e11d48)', 'linear-gradient(135deg,#a3e635,#16a34a)'
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = ms => { const s = ms / 1000; if (s >= 60) { const m = Math.floor(s / 60); return m + ':' + (s - m * 60).toFixed(2).padStart(5, '0'); } return s.toFixed(2); };
+const initials = n => (n.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase();
+function haptic(kind) { try { if (!tg || !tg.HapticFeedback) return; kind === 'success' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred('light'); } catch (e) {} }
+
+function avatarHTML(name, idx, size, isMe, extra) {
+  const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * .34)}px;`;
+  if (isMe && userPhoto) return `<div class="avatar" style="${st}background-image:url('${esc(userPhoto)}')">${extra || ''}</div>`;
+  return `<div class="avatar" style="${st}background:${GRADS[idx % GRADS.length]}">${esc(initials(name))}${extra || ''}</div>`;
+}
+
+/* =========================================================
+   Views
+   ========================================================= */
+function rankList() {
+  const list = OTHERS.map(o => ({ n: o[0], t: o[1], me: false }));
+  if (state.best != null) list.push({ n: userName, t: state.best, me: true });
+  list.sort((a, b) => a.t - b.t);
+  return list;
+}
+function myRankLabel() {
+  if (state.best == null) return '#1,284';
+  return '#' + (rankList().findIndex(x => x.me) + 1);
+}
+
+function renderHome() {
+  const h = new Date().getHours();
+  const greet = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const done = state.lessons.filter(Boolean).length;
+  const pct = Math.round(done / LESSONS.length * 100);
+  const nextIdx = state.lessons.findIndex(x => !x);
+  const lock = '<svg class="lk" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  const avatar = userPhoto
+    ? `<div class="avatar big" style="background-image:url('${esc(userPhoto)}')"></div>`
+    : `<div class="avatar big" style="background:${GRADS[2]}">${esc(initials(userName))}</div>`;
+
+  $('home').innerHTML = `
+    <div class="hero">${avatar}
+      <div><small>${greet}</small><strong>${esc(userName)}</strong><em>${esc(userHandle)}</em></div></div>
+    <div class="pill"><span class="dot"><svg viewBox="0 0 64 64" fill="none" stroke="#12403d" stroke-width="5" stroke-linejoin="round"><path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/></svg></span>
+      Cubix Arena <span class="muted" style="font-weight:500">1,284 cubers</span>
+      <span class="ok"><svg viewBox="0 0 12 12"><path d="m2.5 6.2 2.3 2.3 4.7-5"/></svg></span></div>
+    <div class="modes">
+      <div class="mode on"><i><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></i>3&times;3</div>
+      <div class="mode"><i>2&times;2${lock}</i>2&times;2</div>
+      <div class="mode"><i>4&times;4${lock}</i>4&times;4</div>
+      <div class="mode"><i>P${lock}</i>Pyraminx</div>
+      <div class="mode"><i>M${lock}</i>Mirror</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${state.solves}</b><span>Solves</span></div>
+      <div class="stat"><b>${state.best != null ? fmt(state.best) : '\u2013'}</b><span>Best</span></div>
+      <div class="stat"><b>${done}/${LESSONS.length}</b><span>Lessons</span></div>
+      <div class="stat"><b>${myRankLabel()}</b><span>Rank</span></div>
+    </div>
+    <div class="card"><div class="prog-head">Your progress <b>${pct}%</b></div>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="sec-head">Up next <button id="homeAll">View all</button></div>
+    ${nextIdx === -1
+      ? `<div class="card"><h3 style="margin:0 0 6px">All lessons done</h3><p class="muted" style="margin:0">Beat your best time in Play.</p></div>`
+      : `<button class="card lesson-card" id="homeNext"><div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"><path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/></svg></div>
+        <div><h3>${LESSONS[nextIdx][0]}</h3><p>${LESSONS[nextIdx][1]}</p><span class="tag">+50 XP</span><span class="tag">Step ${nextIdx + 1}</span></div></button>`}
+  `;
+  $('homeAll').onclick = () => switchTab('learn');
+  const hn = $('homeNext'); if (hn) hn.onclick = () => switchTab('learn');
+}
+
+function renderLearn() {
+  const done = state.lessons.filter(Boolean).length;
+  $('learn').innerHTML = `<h1>Learn</h1>
+    <div class="card" style="margin-bottom:20px"><div class="prog-head">Beginner method <b>${done}/${LESSONS.length}</b></div>
+      <div class="bar"><i style="width:${done / LESSONS.length * 100}%"></i></div></div>` +
+    LESSONS.map((l, i) => `<button class="lesson ${state.lessons[i] ? 'done' : ''}" data-i="${i}">
+      <span class="n">${state.lessons[i] ? '\u2713' : i + 1}</span>
+      <span><h3>${l[0]}</h3><p>${l[1]}</p></span></button>`).join('');
+  document.querySelectorAll('#learn .lesson').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i; state.lessons[i] = !state.lessons[i]; haptic(); renderLearn(); renderHome();
+  });
+}
+
+function renderRank() {
+  const list = rankList();
+  const top = list.slice(0, 3), rest = list.slice(3);
+  const pod = (x, place, h) => {
+    const idx = list.indexOf(x);
+    return `<div class="pod p${place}">${avatarHTML(x.n, idx, place === 1 ? 84 : 72, x.me, `<span class="badge">${place}</span>`)}
+      <div class="nm">${esc(x.n)}</div><div class="sc">${fmt(x.t)}</div><div class="step" style="height:${h}px"></div></div>`;
+  };
+  const me = list.findIndex(x => x.me);
+  $('rank').innerHTML = `<h1>Leaderboard</h1>
+    <div class="podium">${pod(top[1], 2, 70)}${pod(top[0], 1, 96)}${pod(top[2], 3, 52)}</div>
+    <div class="me-card"><span class="pos">${myRankLabel()}</span><span class="nm">${esc(userName)}</span>
+      <span class="sc">${state.best != null ? fmt(state.best) : '\u2013'}</span></div>
+    <div class="label">Fastest solves</div>` +
+    rest.map((x, i) => `<div class="row ${x.me ? 'me' : ''}"><span class="pos">${i + 4}</span>
+      ${avatarHTML(x.n, list.indexOf(x), 44, x.me)}<span class="nm">${esc(x.n)}</span><span class="sc">${fmt(x.t)}</span></div>`).join('');
+}
+
+/* =========================================================
+   Navigation
+   ========================================================= */
+let tab = 'home';
+function switchTab(t) {
+  tab = t;
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === t));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (t === 'home') renderHome();
+  if (t === 'learn') renderLearn();
+  if (t === 'rank') renderRank();
+  if (t === 'play') requestAnimationFrame(resizeGL);
+  haptic();
+}
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+
+/* =========================================================
+   Rubik's cube (Three.js)
+   ========================================================= */
+let renderer, scene, camera, cubeRoot, pivot, cubies = [], busy = false;
+const V3 = THREE.Vector3;
+const FACE_COLORS = { '1,0,0': 0xe5383b, '-1,0,0': 0xff8a1f, '0,1,0': 0xf5f5ef, '0,-1,0': 0xffd23f, '0,0,1': 0x2fbf71, '0,0,-1': 0x3a7bd5 };
+const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+function roundedShape(s, r) {
+  const x = -s / 2, y = -s / 2, sh = new THREE.Shape();
+  sh.moveTo(x + r, y); sh.lineTo(x + s - r, y); sh.quadraticCurveTo(x + s, y, x + s, y + r);
+  sh.lineTo(x + s, y + s - r); sh.quadraticCurveTo(x + s, y + s, x + s - r, y + s);
+  sh.lineTo(x + r, y + s); sh.quadraticCurveTo(x, y + s, x, y + s - r);
+  sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y); return sh;
+}
+
+function initGL() {
+  const canvas = $('gl');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(0, 0, 11);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.78));
+  const d1 = new THREE.DirectionalLight(0xffffff, 0.65); d1.position.set(4, 6, 8); scene.add(d1);
+  const d2 = new THREE.DirectionalLight(0x9ffcf0, 0.22); d2.position.set(-6, -3, -5); scene.add(d2);
+
+  cubeRoot = new THREE.Group(); scene.add(cubeRoot);
+  cubeRoot.rotation.set(0.55, -0.72, 0);
+  pivot = new THREE.Object3D(); cubeRoot.add(pivot);
+
+  const bodyGeo = new THREE.BoxGeometry(0.98, 0.98, 0.98);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x12181a });
+  const stickerGeo = new THREE.ShapeGeometry(roundedShape(0.84, 0.13));
+  const mats = {};
+  for (const k in FACE_COLORS) mats[k] = new THREE.MeshLambertMaterial({ color: FACE_COLORS[k] });
+
+  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+    const c = new THREE.Mesh(bodyGeo, bodyMat);
+    c.position.set(x, y, z);
+    c.userData.home = new V3(x, y, z);
+    c.userData.stickers = [];
+    for (const d of DIRS) {
+      if (x * d[0] + y * d[1] + z * d[2] !== 1) continue;
+      const key = d.join(',');
+      const s = new THREE.Mesh(stickerGeo, mats[key]);
+      const n = new V3(...d);
+      s.quaternion.setFromUnitVectors(new V3(0, 0, 1), n);
+      s.position.copy(n).multiplyScalar(0.492);
+      c.add(s);
+      c.userData.stickers.push({ n, key });
+    }
+    cubeRoot.add(c); cubies.push(c);
+  }
+  setupPointer(canvas);
+  new ResizeObserver(resizeGL).observe($('gl').parentElement);
+  window.addEventListener('resize', resizeGL);
+  resizeGL();
+  (function loop() { requestAnimationFrame(loop); if (tab === 'play' && $('gl').clientWidth) renderer.render(scene, camera); })();
+}
+
+function resizeGL() {
+  if (!renderer) return;
+  const el = $('gl').parentElement, w = el.clientWidth, h = el.clientHeight;
+  if (!w || !h) return;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const v = THREE.MathUtils.degToRad(camera.fov / 2), hh = Math.atan(Math.tan(v) * camera.aspect);
+  camera.position.z = 2.75 / Math.sin(Math.min(v, hh));
+  camera.updateProjectionMatrix();
+}
+
+function snap(c) {
+  c.position.set(Math.round(c.position.x), Math.round(c.position.y), Math.round(c.position.z));
+  const m = new THREE.Matrix4().makeRotationFromQuaternion(c.quaternion);
+  m.elements = m.elements.map(e => Math.abs(e) < 0.5 ? 0 : Math.sign(e));
+  c.quaternion.setFromRotationMatrix(m);
+}
+
+function turn(axis, layer, dir, ms) {
+  return new Promise(res => {
+    busy = true;
+    const group = cubies.filter(c => Math.round(c.position[axis]) === layer);
+    group.forEach(c => pivot.attach(c));
+    const t0 = performance.now(), target = dir * Math.PI / 2;
+    (function step(now) {
+      const t = Math.min(1, (now - t0) / ms), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      pivot.rotation[axis] = target * e;
+      if (t < 1) return requestAnimationFrame(step);
+      pivot.updateMatrixWorld(true);
+      group.forEach(c => { cubeRoot.attach(c); snap(c); });
+      pivot.rotation.set(0, 0, 0); pivot.updateMatrixWorld(true);
+      busy = false; res();
+    })(t0);
+  });
+}
+
+function resetCube() {
+  cubies.forEach(c => { if (c.parent !== cubeRoot) cubeRoot.attach(c); c.position.copy(c.userData.home); c.quaternion.identity(); });
+  pivot.rotation.set(0, 0, 0);
+}
+
+function isSolved() {
+  const faces = {};
+  for (const c of cubies) for (const s of c.userData.stickers) {
+    const d = s.n.clone().applyQuaternion(c.quaternion);
+    const k = [Math.round(d.x), Math.round(d.y), Math.round(d.z)].join(',');
+    (faces[k] = faces[k] || new Set()).add(s.key);
+  }
+  return Object.values(faces).every(set => set.size === 1);
+}
+
+/* ---- touch / mouse ---- */
+function toScreen(v) {
+  const w = cubeRoot.localToWorld(v.clone()).project(camera), el = $('gl');
+  return { x: (w.x * .5 + .5) * el.clientWidth, y: (-w.y * .5 + .5) * el.clientHeight };
+}
+function swipeToMove(cubie, n, dx, dy) {
+  cubeRoot.updateMatrixWorld(true); camera.updateMatrixWorld(true);
+  const p = cubie.position.clone(), base = toScreen(p), dl = Math.hypot(dx, dy);
+  let best = null;
+  for (const [name, t] of [['x', new V3(1, 0, 0)], ['y', new V3(0, 1, 0)], ['z', new V3(0, 0, 1)]]) {
+    if (Math.abs(n[name]) > .5) continue;
+    const s = toScreen(p.clone().add(t)), sx = s.x - base.x, sy = s.y - base.y, sl = Math.hypot(sx, sy) || 1;
+    const dot = (dx * sx + dy * sy) / (dl * sl);
+    if (!best || Math.abs(dot) > Math.abs(best.dot)) best = { t, dot };
+  }
+  const d = best.t.clone().multiplyScalar(best.dot >= 0 ? 1 : -1);
+  const a = new V3().crossVectors(n, d);
+  const axis = Math.abs(a.x) > .5 ? 'x' : Math.abs(a.y) > .5 ? 'y' : 'z';
+  return { axis, layer: Math.round(p[axis]), dir: a[axis] > 0 ? 1 : -1 };
+}
+
+function setupPointer(canvas) {
+  const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  let drag = null;
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    if (busy) { drag = { mode: 'none' }; return; }
+    const r = canvas.getBoundingClientRect();
+    mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    cubeRoot.updateMatrixWorld(true); camera.updateMatrixWorld(true);
+    ray.setFromCamera(mouse, camera);
+    const hit = ray.intersectObjects(cubies, false)[0];
+    if (hit) {
+      const n = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
+      n.set(Math.round(n.x), Math.round(n.y), Math.round(n.z));
+      drag = { mode: 'layer', x: e.clientX, y: e.clientY, cubie: hit.object, n, fired: false };
+    } else drag = { mode: 'orbit', x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (drag.mode === 'orbit') {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+      cubeRoot.quaternion.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(dy * 0.009, dx * 0.009, 0)));
+    } else if (drag.mode === 'layer' && !drag.fired) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.hypot(dx, dy) < 16) return;
+      drag.fired = true;
+      const m = swipeToMove(drag.cubie, drag.n, dx, dy);
+      userMove(m);
+    }
+  });
+  const end = () => { drag = null; };
+  canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+}
+
+/* ---- game flow ---- */
+let phase = 'idle', t0 = 0, tick = null;
+function setStatus(s) { $('status').textContent = s; }
+function startTimer() {
+  phase = 'running'; t0 = performance.now(); $('timer').classList.add('run'); setStatus('Solve it!');
+  tick = setInterval(() => { $('timer').textContent = fmt(performance.now() - t0); }, 40);
+}
+function stopTimer() { clearInterval(tick); tick = null; $('timer').classList.remove('run'); }
+
+async function userMove(m) {
+  if (busy) return;
+  haptic();
+  if (phase === 'ready') startTimer();
+  await turn(m.axis, m.layer, m.dir, 170);
+  if (phase === 'running' && isSolved()) finishSolve();
+}
+
+function finishSolve() {
+  const ms = performance.now() - t0; stopTimer();
+  $('timer').textContent = fmt(ms); phase = 'idle'; setStatus('Solved. Scramble for another run.');
+  const prevBest = state.best, isBest = prevBest == null || ms < prevBest;
+  state.solves++; if (isBest) state.best = ms;
+  haptic('success');
+  const sub = prevBest == null ? 'Your first solve. That is your best time.'
+    : isBest ? `New best. ${fmt(prevBest - ms)}s faster than before.`
+    : `${fmt(ms - prevBest)}s slower than your best of ${fmt(prevBest)}.`;
+  $('sheetBody').innerHTML = `<h2>${isBest ? 'New personal best' : 'Solved'}</h2><div class="big">${fmt(ms)}</div>
+    <div class="sub">${sub}</div>
+    <div class="controls"><button class="btn main" id="shAgain">Scramble again</button><button class="btn ghost" id="shClose">Close</button></div>`;
+  $('sheet').classList.add('show');
+  $('shClose').onclick = () => $('sheet').classList.remove('show');
+  $('shAgain').onclick = () => { $('sheet').classList.remove('show'); scramble(); };
+  renderHome(); renderRank();
+}
+
+async function scramble() {
+  if (busy || phase === 'scrambling') return;
+  stopTimer(); resetCube(); phase = 'scrambling';
+  $('timer').textContent = '0.00'; setStatus('Scrambling\u2026');
+  let lastAxis = '', axes = ['x', 'y', 'z'];
+  for (let i = 0; i < 22; i++) {
+    let a; do { a = axes[Math.floor(Math.random() * 3)]; } while (a === lastAxis);
+    lastAxis = a;
+    await turn(a, [-1, 0, 1][Math.floor(Math.random() * 3)] === 0 && Math.random() < .6 ? 1 : [-1, 1][Math.floor(Math.random() * 2)], Math.random() < .5 ? 1 : -1, 75);
+  }
+  if (isSolved()) return scramble();
+  phase = 'ready'; setStatus('Your first move starts the timer.');
+}
+
+$('btnScramble').onclick = scramble;
+$('btnReset').onclick = () => {
+  if (busy) return; stopTimer(); resetCube(); phase = 'idle';
+  $('timer').textContent = '0.00'; setStatus('Free play. Scramble to start a timed solve.');
+};
+
+/* =========================================================
+   Loader: particle ring
+   ========================================================= */
+(function loaderRing() {
+  const cv = $('ring'), ctx = cv.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let S = 0, running = true;
+  function size() { S = cv.clientWidth; cv.width = cv.height = S * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  size(); window.addEventListener('resize', size);
+  const N = 1500, P = [];
+  const cols = ['#5eead4', '#2dd4bf', '#34e0c4', '#99f6e4', '#ffffff', '#ffffff', '#1fb5a3'];
+  for (let i = 0; i < N; i++) P.push({ u: Math.pow(Math.random(), .85), a: Math.random(), b: Math.random(), c: Math.random(),
+    col: cols[Math.floor(Math.random() * cols.length)] });
+  function frame(now) {
+    if (!running) return;
+    ctx.clearRect(0, 0, S, S);
+    const cx = S / 2, R = S * 0.42, head = (now / 3400) * Math.PI * 2;
+    for (const p of P) {
+      const ang = head - p.u * Math.PI * 1.86;
+      const spread = S * 0.085 * Math.pow(p.u, 1.5);
+      const off = spread * (p.a * 1.15 - 0.3) + Math.sin(now / 420 + p.c * 40) * S * 0.004 * p.u;
+      const r = R + off;
+      const sz = (0.7 + 4.6 * p.b * p.b) * (0.25 + p.u * 0.9) * (S / 460) + 0.5;
+      ctx.globalAlpha = 0.35 + 0.65 * (1 - p.u * 0.4);
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * r, cx + Math.sin(ang) * r, sz, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.__stopRing = () => { running = false; };
+})();
+
+/* =========================================================
+   Boot
+   ========================================================= */
+renderHome(); renderLearn(); renderRank();
+const bootStart = performance.now();
+try { initGL(); } catch (e) { console.error('3D init failed', e); }
+const wait = Math.max(0, 2400 - (performance.now() - bootStart));
+setTimeout(() => {
+  $('loader').classList.add('done');
+  setTimeout(() => { $('loader').style.display = 'none'; window.__stopRing && window.__stopRing(); }, 700);
+}, wait);
+</script>
+</body>
+</html>
