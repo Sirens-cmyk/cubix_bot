@@ -296,7 +296,7 @@ const userName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).
 const userHandle = tgUser && tgUser.username ? '@' + tgUser.username : 'Guest';
 const userPhoto = tgUser && tgUser.photo_url;
 
-const state = { solves: 0, best: null, sdSolved: 0, lessons: Array(7).fill(false) };
+const state = { board: [], rank: null, total: null, solves: 0, best: null, sdSolved: 0, lessons: Array(7).fill(false) };
 const LESSONS = [
   ['White cross', 'Build a plus on the white face, edges matching the side centers.'],
   ['White corners', 'Insert the four white corners to finish the first layer.'],
@@ -316,15 +316,34 @@ const GRADS = [
   'linear-gradient(135deg,#f472b6,#e11d48)', 'linear-gradient(135deg,#a3e635,#16a34a)'
 ];
 
+let online = false;
+async function sync(event) {
+  if (!tg || !tg.initData) return null;
+  try {
+    const r = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: tg.initData, event }) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    online = true;
+    state.solves = d.me.cube_solves; state.best = d.me.cube_best_ms; state.sdSolved = d.me.sudoku_solved;
+    state.lessons = LESSONS.map((_, i) => !!(d.me.lessons & (1 << i)));
+    state.board = d.board; state.rank = d.rank; state.total = d.total;
+    renderHome(); renderGames(); renderLearn(); renderRank();
+    return d;
+  } catch (e) { return null; }
+}
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = ms => { const s = ms / 1000; if (s >= 60) { const m = Math.floor(s / 60); return m + ':' + (s - m * 60).toFixed(2).padStart(5, '0'); } return s.toFixed(2); };
+const fmtT = t => (t == null ? '\u2013' : fmt(t));
 const initials = n => (n.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase();
 function haptic(kind) { try { if (!tg || !tg.HapticFeedback) return; kind === 'success' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred('light'); } catch (e) {} }
 
-function avatarHTML(name, idx, size, isMe, extra) {
+function avatarHTML(name, idx, size, isMe, extra, photo) {
   const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * .34)}px;`;
-  if (isMe && userPhoto) return `<div class="avatar" style="${st}background-image:url('${esc(userPhoto)}')">${extra || ''}</div>`;
+  const ph = isMe ? userPhoto : photo;
+  if (ph) return `<div class="avatar" style="${st}background-image:url('${esc(ph)}')">${extra || ''}</div>`;
   return `<div class="avatar" style="${st}background:${GRADS[idx % GRADS.length]}">${esc(initials(name))}${extra || ''}</div>`;
 }
 
@@ -332,12 +351,18 @@ function avatarHTML(name, idx, size, isMe, extra) {
    Views
    ========================================================= */
 function rankList() {
+  if (online) {
+    const l = state.board.slice();
+    while (l.length < 3) l.push({ n: '\u2013', t: null, me: false });
+    return l;
+  }
   const list = OTHERS.map(o => ({ n: o[0], t: o[1], me: false }));
   if (state.best != null) list.push({ n: userName, t: state.best, me: true });
   list.sort((a, b) => a.t - b.t);
   return list;
 }
 function myRankLabel() {
+  if (online) return state.rank ? '#' + state.rank : '\u2013';
   if (state.best == null) return '#1,284';
   return '#' + (rankList().findIndex(x => x.me) + 1);
 }
@@ -357,7 +382,7 @@ function renderHome() {
     <div class="hero">${avatar}
       <div><small>${greet}</small><strong>${esc(userName)}</strong><em>${esc(userHandle)}</em></div></div>
     <div class="pill"><span class="dot"><svg viewBox="0 0 64 64" fill="none" stroke="#12403d" stroke-width="5" stroke-linejoin="round"><path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/></svg></span>
-      Cubix Arena <span class="muted" style="font-weight:500">1,284 cubers</span>
+      Cubix Arena <span class="muted" style="font-weight:500">${state.total != null ? state.total.toLocaleString('en-US') : '1,284'} cubers</span>
       <span class="ok"><svg viewBox="0 0 12 12"><path d="m2.5 6.2 2.3 2.3 4.7-5"/></svg></span></div>
     <div class="modes">
       <div class="mode on"><i><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></i>3&times;3</div>
@@ -393,7 +418,7 @@ function renderLearn() {
       <span class="n">${state.lessons[i] ? '\u2713' : i + 1}</span>
       <span><h3>${l[0]}</h3><p>${l[1]}</p></span></button>`).join('');
   document.querySelectorAll('#learn .lesson').forEach(b => b.onclick = () => {
-    const i = +b.dataset.i; state.lessons[i] = !state.lessons[i]; haptic(); renderLearn(); renderHome();
+    const i = +b.dataset.i; state.lessons[i] = !state.lessons[i]; sync({ type: 'lesson', i, done: state.lessons[i] }); haptic(); renderLearn(); renderHome();
   });
 }
 
@@ -402,8 +427,8 @@ function renderRank() {
   const top = list.slice(0, 3), rest = list.slice(3);
   const pod = (x, place, h) => {
     const idx = list.indexOf(x);
-    return `<div class="pod p${place}">${avatarHTML(x.n, idx, place === 1 ? 84 : 72, x.me, `<span class="badge">${place}</span>`)}
-      <div class="nm">${esc(x.n)}</div><div class="sc">${fmt(x.t)}</div><div class="step" style="height:${h}px"></div></div>`;
+    return `<div class="pod p${place}">${avatarHTML(x.n, idx, place === 1 ? 84 : 72, x.me, `<span class="badge">${place}</span>`, x.photo)}
+      <div class="nm">${esc(x.n)}</div><div class="sc">${fmtT(x.t)}</div><div class="step" style="height:${h}px"></div></div>`;
   };
   const me = list.findIndex(x => x.me);
   $('rank').innerHTML = `<h1>Leaderboard</h1>
@@ -412,7 +437,7 @@ function renderRank() {
       <span class="sc">${state.best != null ? fmt(state.best) : '\u2013'}</span></div>
     <div class="label">Fastest solves</div>` +
     rest.map((x, i) => `<div class="row ${x.me ? 'me' : ''}"><span class="pos">${i + 4}</span>
-      ${avatarHTML(x.n, list.indexOf(x), 44, x.me)}<span class="nm">${esc(x.n)}</span><span class="sc">${fmt(x.t)}</span></div>`).join('');
+      ${avatarHTML(x.n, list.indexOf(x), 44, x.me, '', x.photo)}<span class="nm">${esc(x.n)}</span><span class="sc">${fmtT(x.t)}</span></div>`).join('');
 }
 
 /* =========================================================
@@ -620,7 +645,7 @@ function setupPointer(canvas) {
 let phase = 'idle', t0 = 0, tick = null;
 function setStatus(s) { $('status').textContent = s; }
 function startTimer() {
-  phase = 'running'; t0 = performance.now(); $('timer').classList.add('run'); setStatus('Solve it!');
+  sync({ type: 'cube_start' }); phase = 'running'; t0 = performance.now(); $('timer').classList.add('run'); setStatus('Solve it!');
   tick = setInterval(() => { $('timer').textContent = fmt(performance.now() - t0); }, 40);
 }
 function stopTimer() { clearInterval(tick); tick = null; $('timer').classList.remove('run'); }
@@ -637,7 +662,7 @@ function finishSolve() {
   const ms = performance.now() - t0; stopTimer();
   $('timer').textContent = fmt(ms); phase = 'idle'; setStatus('Solved. Scramble for another run.');
   const prevBest = state.best, isBest = prevBest == null || ms < prevBest;
-  state.solves++; if (isBest) state.best = ms;
+  state.solves++; if (isBest) state.best = ms; sync({ type: 'cube_solve' });
   haptic('success');
   const sub = prevBest == null ? 'Your first solve. That is your best time.'
     : isBest ? `New best. ${fmt(prevBest - ms)}s faster than before.`
@@ -858,7 +883,7 @@ function showSheet(title, big, sub, buttons) {
   $('sheet').classList.add('show');
 }
 function sdWin() {
-  sdPause(); SD.over = true; state.sdSolved++; haptic('success'); paintSd();
+  sdPause(); SD.over = true; state.sdSolved++; sync({ type: 'sudoku_win' }); haptic('success'); paintSd();
   const d = SD.diff[0].toUpperCase() + SD.diff.slice(1), m = SD.mistakes;
   showSheet('Puzzle solved', sdTimeStr(), `${d}, ${m === 0 ? 'no mistakes' : m + (m === 1 ? ' mistake' : ' mistakes')}.`,
     [['New puzzle', 'main', () => newSudoku(SD.diff)], ['Close', 'ghost', () => {}]]);
@@ -906,7 +931,7 @@ function sdLose() {
 /* =========================================================
    Boot
    ========================================================= */
-renderHome(); renderGames(); renderLearn(); renderRank(); buildSdUI();
+renderHome(); renderGames(); renderLearn(); renderRank(); buildSdUI(); sync();
 const bootStart = performance.now();
 try { initGL(); } catch (e) { console.error('3D init failed', e); }
 const wait = Math.max(0, 2400 - (performance.now() - bootStart));
