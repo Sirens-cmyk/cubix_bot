@@ -168,6 +168,15 @@ h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spaci
 .sd-pad button small{font-size:10px;color:var(--muted)}
 .sd-pad button:disabled{opacity:.3}
 
+/* ---------- Arena ---------- */
+.btn.wide{width:100%}
+.note{color:var(--muted);font-size:14px;line-height:1.5;margin:12px 2px}
+.pass-card{background:linear-gradient(135deg,#1f4944,#2e4a4b);border:1px solid #2a6b66;border-radius:22px;padding:20px;margin:16px 0}
+.pass-card h3{margin:0 0 6px;font-size:19px}
+.pass-card p{margin:0 0 16px;color:#a9c3c1;font-size:14.5px;line-height:1.45}
+.pass-on{display:inline-block;padding:6px 14px;border-radius:99px;background:#1f4944;color:var(--mint);font-weight:700;font-size:14px;margin:0 0 14px}
+.gap{height:12px}
+
 /* ---------- Learn ---------- */
 .lesson{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-bottom:12px;
   background:var(--card);border:1px solid #435055;border-radius:20px;padding:16px}
@@ -245,6 +254,7 @@ h1{font-size:34px;line-height:1.1;margin:6px 0 20px;font-weight:700;letter-spaci
     <section id="home" class="view active"></section>
 
     <section id="games" class="view"></section>
+    <section id="arena" class="view"></section>
 
     <section id="play" class="view">
       <button class="back" data-go="games">&lsaquo; Games</button>
@@ -296,7 +306,7 @@ const userName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).
 const userHandle = tgUser && tgUser.username ? '@' + tgUser.username : 'Guest';
 const userPhoto = tgUser && tgUser.photo_url;
 
-const state = { board: [], rank: null, total: null, solves: 0, best: null, sdSolved: 0, lessons: Array(7).fill(false) };
+const state = { arena: null, board: [], rank: null, total: null, solves: 0, best: null, sdSolved: 0, lessons: Array(7).fill(false) };
 const LESSONS = [
   ['White cross', 'Build a plus on the white face, edges matching the side centers.'],
   ['White corners', 'Insert the four white corners to finish the first layer.'],
@@ -317,6 +327,8 @@ const GRADS = [
 ];
 
 let online = false;
+let challenge = null;
+let arenaMode = 'daily';
 async function sync(event) {
   if (!tg || !tg.initData) return null;
   try {
@@ -328,7 +340,8 @@ async function sync(event) {
     state.solves = d.me.cube_solves; state.best = d.me.cube_best_ms; state.sdSolved = d.me.sudoku_solved;
     state.lessons = LESSONS.map((_, i) => !!(d.me.lessons & (1 << i)));
     state.board = d.board; state.rank = d.rank; state.total = d.total;
-    renderHome(); renderGames(); renderLearn(); renderRank();
+    if (d.arena) state.arena = d.arena;
+    renderHome(); renderGames(); renderLearn(); renderRank(); renderArena();
     return d;
   } catch (e) { return null; }
 }
@@ -446,11 +459,13 @@ function renderRank() {
 let tab = 'home';
 function switchTab(t) {
   tab = t;
-  const navTab = (t === 'play' || t === 'sudoku') ? 'games' : t;
+  const navTab = (t === 'play' || t === 'sudoku' || t === 'arena') ? 'games' : t;
+  if (t !== 'play') challenge = null;
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === t));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === navTab));
   if (t === 'home') renderHome();
   if (t === 'games') renderGames();
+  if (t === 'arena') { renderArena(); sync({ type: 'arena' }); }
   if (t === 'learn') renderLearn();
   if (t === 'rank') renderRank();
   if (t === 'play') requestAnimationFrame(resizeGL);
@@ -458,7 +473,7 @@ function switchTab(t) {
   haptic();
 }
 document.querySelectorAll('#nav button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
-document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) switchTab(b.dataset.go); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { if (b.dataset.mode) arenaMode = b.dataset.mode; switchTab(b.dataset.go); } });
 
 function renderGames() {
   $('games').innerHTML = `<h1>Games</h1>
@@ -466,6 +481,14 @@ function renderGames() {
       <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"><path d="M32 6 56 19v26L32 58 8 45V19z"/><path d="M8 19l24 13 24-13M32 32v26"/></svg></div>
       <div><h3>Rubik\u2019s Cube</h3><p>Scramble the 3&times;3 and race the clock.</p>
       <span class="tag">${state.best != null ? 'Best ' + fmt(state.best) : 'Not played yet'}</span></div></button>
+    <button class="card lesson-card" data-go="arena" data-mode="daily">
+      <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="13" width="46" height="42" rx="7"/><path d="M9 26h46M21 8v11M43 8v11"/><path d="M24 40l6 6 11-12"/></svg></div>
+      <div><h3>Daily challenge</h3><p>One scramble for everyone. Beat the world today.</p>
+      <span class="tag">Free</span></div></button>
+    <button class="card lesson-card" data-go="arena" data-mode="weekly">
+      <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10h24v16a12 12 0 0 1-24 0zM20 14H9v4a9 9 0 0 0 11 8.7M44 14h11v4a9 9 0 0 1-11 8.7M32 38v10M22 55h20"/></svg></div>
+      <div><h3>Weekly tournament</h3><p>A week-long scramble with its own leaderboard.</p>
+      <span class="tag">${passActive() ? 'Pass active' : 'Weekly pass'}</span></div></button>
     <button class="card lesson-card" data-go="sudoku">
       <div class="tile"><svg viewBox="0 0 64 64" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linecap="round"><rect x="8" y="8" width="48" height="48" rx="6"/><path d="M24 8v48M40 8v48M8 24h48M8 40h48" stroke-width="2.2"/><path d="M28 30l4-3v10" stroke-width="3"/></svg></div>
       <div><h3>Sudoku</h3><p>Fill every row, column and box with 1 to 9.</p>
@@ -645,7 +668,7 @@ function setupPointer(canvas) {
 let phase = 'idle', t0 = 0, tick = null;
 function setStatus(s) { $('status').textContent = s; }
 function startTimer() {
-  sync({ type: 'cube_start' }); phase = 'running'; t0 = performance.now(); $('timer').classList.add('run'); setStatus('Solve it!');
+  sync(challenge ? { type: 'run_start', mode: challenge } : { type: 'cube_start' }); phase = 'running'; t0 = performance.now(); $('timer').classList.add('run'); setStatus('Solve it!');
   tick = setInterval(() => { $('timer').textContent = fmt(performance.now() - t0); }, 40);
 }
 function stopTimer() { clearInterval(tick); tick = null; $('timer').classList.remove('run'); }
@@ -680,19 +703,21 @@ async function scramble() {
   if (busy || phase === 'scrambling') return;
   stopTimer(); resetCube(); phase = 'scrambling';
   $('timer').textContent = '0.00'; setStatus('Scrambling\u2026');
+  const R = challenge && state.arena ? mulberry32(xmur3(challenge + ':' + state.arena.periods[challenge])()) : Math.random;
   let lastAxis = '', axes = ['x', 'y', 'z'];
   for (let i = 0; i < 22; i++) {
-    let a; do { a = axes[Math.floor(Math.random() * 3)]; } while (a === lastAxis);
+    let a; do { a = axes[Math.floor(R() * 3)]; } while (a === lastAxis);
     lastAxis = a;
-    await turn(a, Math.random() < .5 ? -1 : 1, Math.random() < .5 ? 1 : -1, 75);
+    await turn(a, R() < .5 ? -1 : 1, R() < .5 ? 1 : -1, 75);
   }
-  if (isSolved()) return scramble();
-  phase = 'ready'; setStatus('Your first move starts the timer.');
+  if (!challenge && isSolved()) return scramble();
+  phase = 'ready';
+  setStatus((challenge === 'daily' ? 'Daily challenge. ' : challenge === 'weekly' ? 'Weekly tournament. ' : '') + 'Your first move starts the timer.');
 }
 
 $('btnScramble').onclick = scramble;
 $('btnReset').onclick = () => {
-  if (busy) return; stopTimer(); resetCube(); phase = 'idle';
+  if (busy) return; challenge = null; stopTimer(); resetCube(); phase = 'idle';
   $('timer').textContent = '0.00'; setStatus('Free play. Scramble to start a timed solve.');
 };
 
@@ -895,6 +920,92 @@ function sdLose() {
 }
 
 /* =========================================================
+   Arena: daily / weekly challenges and weekly pass
+   ========================================================= */
+function xmur3(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return function () { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; };
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function passActive() { return !!(state.arena && state.arena.pass_until && Date.parse(state.arena.pass_until) > Date.now()); }
+
+function renderArena() {
+  const el = $('arena'); if (!el) return;
+  const a = state.arena, m = arenaMode, d = a && a[m];
+  const head = `<button class="back" data-go="games">&lsaquo; Games</button><h1>Arena</h1>
+    <div class="seg" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px">
+      <button data-m="daily" class="${m === 'daily' ? 'on' : ''}">Daily</button>
+      <button data-m="weekly" class="${m === 'weekly' ? 'on' : ''}">Weekly</button></div>`;
+  let body;
+  if (!online) {
+    body = `<div class="card"><h3 style="margin:0 0 6px">Open the game from Telegram</h3><p class="muted" style="margin:0">The arena needs your Telegram account to rank you.</p></div>`;
+  } else if (!a) {
+    body = `<p class="note">Loading\u2026</p>`;
+  } else {
+    const locked = m === 'weekly' && !passActive();
+    const info = m === 'daily'
+      ? 'Everyone gets the same scramble today. Your best time counts. Resets at 00:00 UTC.'
+      : 'One scramble for the whole week. Your best time counts. Resets every Monday at 00:00 UTC.';
+    const until = a.pass_until ? new Date(a.pass_until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    let action = '';
+    if (locked) {
+      action = `<div class="pass-card"><h3>Weekly Arena Pass</h3>
+        <p>Unlock the weekly tournament for 7 days. Pay once with Telegram Stars, no auto-renewal.</p>
+        <button class="btn main wide" id="arBuy">Get the pass for ${a.stars} \u2605</button></div>`;
+    } else {
+      action = (m === 'weekly' ? `<span class="pass-on">Pass active until ${until}</span>` : '') +
+        `<button class="btn main wide" id="arPlay">Play ${m === 'daily' ? 'today\u2019s challenge' : 'this week\u2019s scramble'}</button>` +
+        (m === 'weekly' ? `<div class="gap"></div><button class="btn ghost wide" id="arBuy">Extend 7 days for ${a.stars} \u2605</button>` : '');
+    }
+    const rows = d.board.map((x, i) => `<div class="row ${x.me ? 'me' : ''}"><span class="pos">${i + 1}</span>
+      ${avatarHTML(x.n, i, 44, x.me, '', x.photo)}<span class="nm">${esc(x.n)}</span><span class="sc">${fmtT(x.t)}</span></div>`).join('');
+    body = `<p class="note" style="margin-top:0">${info}</p>${action}
+      <div class="me-card" style="margin-top:20px"><span class="pos">${d.rank ? '#' + d.rank : '\u2013'}</span>
+        <span class="nm">${esc(userName)}</span><span class="sc">${d.best != null ? fmt(d.best) : '\u2013'}</span></div>
+      <div class="label">Fastest times</div>${rows || '<p class="note">No times yet. Be the first.</p>'}`;
+  }
+  el.innerHTML = head + body;
+  el.querySelectorAll('.seg [data-m]').forEach(b => b.onclick = () => { arenaMode = b.dataset.m; renderArena(); });
+  const pl = $('arPlay'); if (pl) pl.onclick = () => openChallenge(arenaMode);
+  const bu = $('arBuy'); if (bu) bu.onclick = buyPass;
+}
+
+function openChallenge(mode) {
+  if (!state.arena) return;
+  if (mode === 'weekly' && !passActive()) return;
+  switchTab('play'); challenge = mode; scramble();
+}
+
+async function buyPass() {
+  const btn = $('arBuy'); if (btn) btn.disabled = true;
+  const before = state.arena && state.arena.pass_until;
+  const d = await sync({ type: 'buy_pass' });
+  if (btn) btn.disabled = false;
+  if (!d || !d.invoice || !tg || !tg.openInvoice) {
+    try { tg.showAlert('Payments are unavailable right now. Please try again later.'); } catch (e) {}
+    return;
+  }
+  tg.openInvoice(d.invoice, async status => {
+    if (status !== 'paid') return;
+    haptic('success');
+    for (let i = 0; i < 8; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      await sync({ type: 'arena' });
+      if (state.arena && state.arena.pass_until !== before) break;
+    }
+    renderArena(); renderGames();
+  });
+}
+
+/* =========================================================
    Loader: particle ring
    ========================================================= */
 (function loaderRing() {
@@ -931,7 +1042,7 @@ function sdLose() {
 /* =========================================================
    Boot
    ========================================================= */
-renderHome(); renderGames(); renderLearn(); renderRank(); buildSdUI(); sync();
+renderHome(); renderGames(); renderLearn(); renderRank(); renderArena(); buildSdUI(); sync();
 const bootStart = performance.now();
 try { initGL(); } catch (e) { console.error('3D init failed', e); }
 const wait = Math.max(0, 2400 - (performance.now() - bootStart));
